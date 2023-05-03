@@ -1,69 +1,66 @@
 import time
 import random
-import requests
+import string
+import threading
+import couchdb
 
-# set up the base URL for the CouchDB instance
-couchdb_url = 'http://localhost:5984'
+# Set up the database connection
+couch = couchdb.Server('http://localhost:5984')
+db = couch['mydatabase']
 
-# set up the name of the database to use
-db_name = 'mydatabase'
+# Define the CRUD functions
+def insert_data():
+    for i in range(10000):
+        doc = {
+            'type': 'data',
+            'name': ''.join(random.choices(string.ascii_letters, k=10)),
+            'value': random.randint(1, 10000)
+        }
+        db.save(doc)
 
-# set up the number of documents to insert, update, delete and read
-num_docs = 1000
+def update_data():
+    for i in range(10000):
+        doc_id = random.choice(list(db))
+        doc = db[doc_id]
+        doc['value'] = random.randint(1, 10000)
+        db.save(doc)
 
-# set up the list of documents to use
-docs = []
+def delete_data():
+    for i in range(10000):
+        doc_id = random.choice(list(db))
+        db.delete(db[doc_id])
 
-for i in range(num_docs):
-    # generate a random document ID
-    doc_id = str(i)
+def read_data():
+    for i in range(10000):
+        doc_id = random.choice(list(db))
+        doc = db[doc_id]
 
-    # generate a random value for the document
-    doc_value = random.randint(0, 100)
-
-    # add the document to the list
-    docs.append({'_id': doc_id, 'value': doc_value})
-
-# create the database if it doesn't exist
-resp = requests.put(f'{couchdb_url}/{db_name}')
-if resp.status_code == 201:
-    print(f'Created database {db_name}')
-
-# define the function to insert a document into the database
-def insert_doc(doc):
+# Define the benchmark function
+def benchmark():
     start_time = time.time()
-    resp = requests.post(f'{couchdb_url}/{db_name}', json=doc)
+
+    # Create threads for each CRUD operation
+    threads = []
+    insert_thread = threading.Thread(target=insert_data)
+    update_thread = threading.Thread(target=update_data)
+    delete_thread = threading.Thread(target=delete_data)
+    read_thread = threading.Thread(target=read_data)
+    threads.append(insert_thread)
+    threads.append(update_thread)
+    threads.append(delete_thread)
+    threads.append(read_thread)
+
+    # Start the threads
+    for thread in threads:
+        thread.start()
+
+    # Wait for the threads to finish
+    for thread in threads:
+        thread.join()
+
     end_time = time.time()
     elapsed_time = end_time - start_time
-    print(f'Inserted document {doc["_id"]} in {elapsed_time:.6f} seconds')
+    print(f"Elapsed time: {elapsed_time} seconds")
 
-# define the function to update a document in the database
-def update_doc(doc):
-    start_time = time.time()
-    resp = requests.put(f'{couchdb_url}/{db_name}/{doc["_id"]}', json={'_rev': doc['_rev'], 'value': random.randint(0, 100)})
-    end_time = time.time()
-    elapsed_time = end_time - start_time
-    print(f'Updated document {doc["_id"]} in {elapsed_time:.6f} seconds')
-
-# define the function to delete a document from the database
-def delete_doc(doc):
-    start_time = time.time()
-    resp = requests.delete(f'{couchdb_url}/{db_name}/{doc["_id"]}?rev={doc["_rev"]}')
-    end_time = time.time()
-    elapsed_time = end_time - start_time
-    print(f'Deleted document {doc["_id"]} in {elapsed_time:.6f} seconds')
-
-# define the function to read a document from the database
-def read_doc(doc):
-    start_time = time.time()
-    resp = requests.get(f'{couchdb_url}/{db_name}/{doc["_id"]}')
-    end_time = time.time()
-    elapsed_time = end_time - start_time
-    print(f'Read document {doc["_id"]} in {elapsed_time:.6f} seconds')
-
-# perform the CRUD operations simultaneously
-for doc in docs:
-    insert_doc(doc)
-    update_doc(doc)
-    delete_doc(doc)
-    read_doc(doc)
+# Run the benchmark function
+benchmark()
