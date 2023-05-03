@@ -1,93 +1,84 @@
 import random
 import string
 import time
-import threading
-import uuid
-from couchdb import Server
+import concurrent.futures
+import requests
 
-NUM_THREADS = 10
-NUM_DOCS = 1000
-DB_NAME = 'mydb'
-DB_URL = 'http://localhost:5984/'
 
-def random_string(length):
-    """Generate a random string of fixed length."""
-    letters = string.ascii_lowercase
-    return ''.join(random.choice(letters) for i in range(length))
+# Function to generate random document ID
+def random_doc_id():
+    return ''.join(random.choices(string.ascii_lowercase + string.digits, k=10))
 
-def generate_doc():
-    """Generate a random document."""
-    doc_id = str(uuid.uuid4())
-    doc = {'_id': doc_id, 'name': random_string(10), 'age': random.randint(20, 50)}
-    return doc
 
-def insert_docs():
-    """Insert documents into CouchDB."""
-    server = Server(DB_URL)
-    db = server[DB_NAME]
-    for i in range(NUM_DOCS):
-        doc = generate_doc()
-        db.save(doc)
+# Function to generate random document content
+def random_doc_content():
+    return {
+        'title': ''.join(random.choices(string.ascii_lowercase, k=10)),
+        'body': ''.join(random.choices(string.ascii_lowercase, k=50))
+    }
 
-def update_docs():
-    """Update documents in CouchDB."""
-    server = Server(DB_URL)
-    db = server[DB_NAME]
-    for i in range(NUM_DOCS):
-        doc_id = str(i+1)
-        doc = db.get(doc_id)
-        doc['name'] = random_string(10)
-        db.save(doc)
 
-def delete_docs():
-    """Delete documents from CouchDB."""
-    server = Server(DB_URL)
-    db = server[DB_NAME]
-    for i in range(NUM_DOCS):
-        doc_id = str(i+1)
-        doc = db.get(doc_id)
-        db.delete(doc)
+# Function to insert a document
+def insert_doc():
+    url = 'http://localhost:5984/mydatabase'
+    headers = {'Content-Type': 'application/json'}
+    data = {'_id': random_doc_id(), 'content': random_doc_content()}
+    response = requests.post(url, headers=headers, json=data)
+    return response
 
-def read_docs():
-    """Read documents from CouchDB."""
-    server = Server(DB_URL)
-    db = server[DB_NAME]
-    for i in range(NUM_DOCS):
-        doc_id = str(i+1)
-        doc = db.get(doc_id)
 
-# Start the timer
-start_time = time.time()
+# Function to update a document
+def update_doc():
+    url = 'http://localhost:5984/mydatabase/' + random_doc_id()
+    headers = {'Content-Type': 'application/json'}
+    response = requests.get(url)
+    if response.status_code == 200:
+        doc = response.json()
+        doc['content'] = random_doc_content()
+        response = requests.put(url, headers=headers, json=doc)
+    return response
 
-# Start the threads for CRUD operations
-threads = []
-for i in range(NUM_THREADS):
-    thread = threading.Thread(target=insert_docs)
-    threads.append(thread)
-    thread.start()
 
-for i in range(NUM_THREADS):
-    thread = threading.Thread(target=update_docs)
-    threads.append(thread)
-    thread.start()
+# Function to delete a document
+def delete_doc():
+    url = 'http://localhost:5984/mydatabase/' + random_doc_id()
+    headers = {'Content-Type': 'application/json'}
+    response = requests.get(url)
+    if response.status_code == 200:
+        doc = response.json()
+        doc['_deleted'] = True
+        response = requests.put(url, headers=headers, json=doc)
+    return response
 
-for i in range(NUM_THREADS):
-    thread = threading.Thread(target=delete_docs)
-    threads.append(thread)
-    thread.start()
 
-for i in range(NUM_THREADS):
-    thread = threading.Thread(target=read_docs)
-    threads.append(thread)
-    thread.start()
+# Function to read a document
+def read_doc():
+    url = 'http://localhost:5984/mydatabase/' + random_doc_id()
+    response = requests.get(url)
+    return response
 
-# Wait for all threads to complete
-for thread in threads:
-    thread.join()
 
-# End the timer
-end_time = time.time()
+# Main function to run the benchmark
+def run_benchmark(num_ops):
+    with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
+        insert_futures = []
+        update_futures = []
+        delete_futures = []
+        read_futures = []
+        start_time = time.time()
+        for i in range(num_ops):
+            insert_futures.append(executor.submit(insert_doc))
+            update_futures.append(executor.submit(update_doc))
+            delete_futures.append(executor.submit(delete_doc))
+            read_futures.append(executor.submit(read_doc))
+        for future in concurrent.futures.as_completed(insert_futures + update_futures + delete_futures + read_futures):
+            if future.exception() is not None:
+                print(future.exception())
+    end_time = time.time()
+    total_time = end_time - start_time
+    print(f'Total time taken for {num_ops} operations: {total_time:.2f} seconds')
+    print(f'Throughput: {num_ops / total_time:.2f} operations per second')
 
-# Print the benchmarking results
-print(f'Total time taken: {end_time - start_time:.2f} seconds')
-print(f'Average time per operation: {(end_time - start_time) / (NUM_THREADS * NUM_DOCS * 4):.6f} seconds')
+
+if __name__ == '__main__':
+    run_benchmark(1000)  # Change the number of operations as required
