@@ -1,69 +1,69 @@
 import time
 import random
-import string
-import couchdb
+import requests
 
-# Set up connection to CouchDB
-couch = couchdb.Server('http://localhost:5984/')
-db_name = 'test_db'
-if db_name not in couch:
-    db = couch.create(db_name)
-else:
-    db = couch[db_name]
+# set up the base URL for the CouchDB instance
+couchdb_url = 'http://localhost:5984'
 
-# Define functions for CRUD operations
-def create_document():
-    doc_id = ''.join(random.choices(string.ascii_uppercase + string.digits, k=10))
-    doc_data = {'random_data': ''.join(random.choices(string.ascii_uppercase + string.digits, k=100))}
-    db.save(doc_data)
-    return doc_id
+# set up the name of the database to use
+db_name = 'mydatabase'
 
-def read_document(doc_id):
-    doc = db.get(doc_id)
-    return doc['_rev']
+# set up the number of documents to insert, update, delete and read
+num_docs = 1000
 
-def update_document(doc_id, doc_rev):
-    doc = db.get(doc_id)
-    doc['random_data'] = ''.join(random.choices(string.ascii_uppercase + string.digits, k=100))
-    db.save(doc)
+# set up the list of documents to use
+docs = []
 
-def delete_document(doc_id, doc_rev):
-    doc = db.get(doc_id)
-    db.delete(doc)
+for i in range(num_docs):
+    # generate a random document ID
+    doc_id = str(i)
 
-# Define function to capture performance benchmark of CRUD operations
-def measure_performance():
-    create_times = []
-    read_times = []
-    update_times = []
-    delete_times = []
+    # generate a random value for the document
+    doc_value = random.randint(0, 100)
 
-    for i in range(1000):
-        # Measure time for create operation
-        start_time = time.time()
-        doc_id = create_document()
-        create_times.append(time.time() - start_time)
+    # add the document to the list
+    docs.append({'_id': doc_id, 'value': doc_value})
 
-        # Measure time for read operation
-        start_time = time.time()
-        doc_rev = read_document(doc_id)
-        read_times.append(time.time() - start_time)
+# create the database if it doesn't exist
+resp = requests.put(f'{couchdb_url}/{db_name}')
+if resp.status_code == 201:
+    print(f'Created database {db_name}')
 
-        # Measure time for update operation
-        start_time = time.time()
-        update_document(doc_id, doc_rev)
-        update_times.append(time.time() - start_time)
+# define the function to insert a document into the database
+def insert_doc(doc):
+    start_time = time.time()
+    resp = requests.post(f'{couchdb_url}/{db_name}', json=doc)
+    end_time = time.time()
+    elapsed_time = end_time - start_time
+    print(f'Inserted document {doc["_id"]} in {elapsed_time:.6f} seconds')
 
-        # Measure time for delete operation
-        start_time = time.time()
-        delete_document(doc_id, doc_rev)
-        delete_times.append(time.time() - start_time)
+# define the function to update a document in the database
+def update_doc(doc):
+    start_time = time.time()
+    resp = requests.put(f'{couchdb_url}/{db_name}/{doc["_id"]}', json={'_rev': doc['_rev'], 'value': random.randint(0, 100)})
+    end_time = time.time()
+    elapsed_time = end_time - start_time
+    print(f'Updated document {doc["_id"]} in {elapsed_time:.6f} seconds')
 
-    # Print performance benchmark results
-    print(f'Average create time: {sum(create_times)/len(create_times)} seconds')
-    print(f'Average read time: {sum(read_times)/len(read_times)} seconds')
-    print(f'Average update time: {sum(update_times)/len(update_times)} seconds')
-    print(f'Average delete time: {sum(delete_times)/len(delete_times)} seconds')
+# define the function to delete a document from the database
+def delete_doc(doc):
+    start_time = time.time()
+    resp = requests.delete(f'{couchdb_url}/{db_name}/{doc["_id"]}?rev={doc["_rev"]}')
+    end_time = time.time()
+    elapsed_time = end_time - start_time
+    print(f'Deleted document {doc["_id"]} in {elapsed_time:.6f} seconds')
 
-if __name__ == '__main__':
-    measure_performance()
+# define the function to read a document from the database
+def read_doc(doc):
+    start_time = time.time()
+    resp = requests.get(f'{couchdb_url}/{db_name}/{doc["_id"]}')
+    end_time = time.time()
+    elapsed_time = end_time - start_time
+    print(f'Read document {doc["_id"]} in {elapsed_time:.6f} seconds')
+
+# perform the CRUD operations simultaneously
+for doc in docs:
+    insert_doc(doc)
+    update_doc(doc)
+    delete_doc(doc)
+    read_doc(doc)
