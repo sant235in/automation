@@ -35,3 +35,16 @@ pipeline {
         }
     }
 }
+
+
+
+
+In this pipeline, the Upload file to Artifactory stage calls a shell script named upload_to_artifactory.sh. The returnStatus: true option captures the exit status of the shell script.
+
+The scriptStatus variable captures the exit status of the shell script. If the scriptStatus is not equal to 0, the shell script execution failed and the pipeline displays a failure message using the error step. This will stop the pipeline execution if the shell script fails.
+
+The subsequent stages Build and Deploy are conditionally executed based on the success or failure status of the previous stages. The when directive is used to conditionally execute the subsequent stages and steps based on the success or failure status of the previous stages.
+
+If any stage fails, the subsequent stages will not execute. This is because the when directive for each stage checks the currentBuild.result before executing the stage. If the previous stage failed, the currentBuild.result will be set to "FAILURE", and subsequent stages will not execute.
+
+You can customize this pipeline to suit your own requirements by adding additional stages and steps as needed. For example, you can add a stage to run tests and another stage to clean up after the build and deployment.
