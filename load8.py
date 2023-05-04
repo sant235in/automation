@@ -1,64 +1,71 @@
 import time
 import random
-import couchdb
+import string
+import requests
 
-# Define CouchDB connection parameters
-couch_url = 'http://localhost:5984/'
-db_name = 'mydatabase'
-couch = couchdb.Server(couch_url)
+# Replace with your own database URL and name
+DB_URL = 'http://localhost:5984'
+DB_NAME = 'test_db'
 
-# Create database if it doesn't exist
-if db_name not in couch:
-    db = couch.create(db_name)
+# Generate a random string of length n
+def random_string(n):
+    return ''.join(random.choices(string.ascii_letters, k=n))
+
+# Create a new document in the database
+def create_document():
+    data = {'name': random_string(10), 'age': random.randint(1, 100)}
+    response = requests.post(f'{DB_URL}/{DB_NAME}', json=data)
+    if response.status_code == 201:
+        return response.json()['id']
+    else:
+        return None
+
+# Read a document from the database
+def read_document(doc_id):
+    response = requests.get(f'{DB_URL}/{DB_NAME}/{doc_id}')
+    if response.status_code == 200:
+        return response.json()
+    else:
+        return None
+
+# Update a document in the database
+def update_document(doc_id):
+    doc = read_document(doc_id)
+    if doc is None:
+        return False
+    doc['name'] = random_string(10)
+    response = requests.put(f'{DB_URL}/{DB_NAME}/{doc_id}', json=doc)
+    return response.status_code == 200
+
+# Delete a document from the database
+def delete_document(doc_id):
+    doc = read_document(doc_id)
+    if doc is None:
+        return False
+    rev = doc['_rev']
+    response = requests.delete(f'{DB_URL}/{DB_NAME}/{doc_id}?rev={rev}')
+    return response.status_code == 200
+
+# Measure the time taken to perform n iterations of a function
+def measure_time(fn, n):
+    start_time = time.time()
+    for i in range(n):
+        fn()
+    end_time = time.time()
+    return end_time - start_time
+
+# Test the CRUD operations and measure the performance
+n = 1000  # Number of iterations
+create_time = measure_time(create_document, n)
+print(f'Create time per document: {create_time / n:.6f} seconds')
+
+doc_id = create_document()
+if doc_id is not None:
+    read_time = measure_time(lambda: read_document(doc_id), n)
+    print(f'Read time per document: {read_time / n:.6f} seconds')
+    update_time = measure_time(lambda: update_document(doc_id), n)
+    print(f'Update time per document: {update_time / n:.6f} seconds')
+    delete_time = measure_time(lambda: delete_document(doc_id), n)
+    print(f'Delete time per document: {delete_time / n:.6f} seconds')
 else:
-    db = couch[db_name]
-
-# Define number of documents to insert, update, delete and read
-num_docs = 10000
-
-# Define sample document structure
-doc_template = {
-    'type': 'mydoc',
-    'name': '',
-    'age': 0,
-    'email': '',
-    'address': '',
-}
-
-# Insert documents into database
-start_time = time.time()
-for i in range(num_docs):
-    doc = doc_template.copy()
-    doc['name'] = f'name_{i}'
-    doc['age'] = random.randint(18, 65)
-    doc['email'] = f'name_{i}@example.com'
-    doc['address'] = f'Address {i}'
-    db.save(doc)
-insert_time = time.time() - start_time
-
-# Update documents in database
-start_time = time.time()
-for i in range(num_docs):
-    doc = db.get(f'mydoc_{i}')
-    doc['age'] = random.randint(18, 65)
-    db.save(doc)
-update_time = time.time() - start_time
-
-# Delete documents from database
-start_time = time.time()
-for i in range(num_docs):
-    doc = db.get(f'mydoc_{i}')
-    db.delete(doc)
-delete_time = time.time() - start_time
-
-# Read documents from database
-start_time = time.time()
-for i in range(num_docs):
-    doc = db.get(f'mydoc_{i}')
-read_time = time.time() - start_time
-
-# Print results
-print(f'Insert time: {insert_time}')
-print(f'Update time: {update_time}')
-print(f'Delete time: {delete_time}')
-print(f'Read time: {read_time}')
+    print('Failed to create a document')
