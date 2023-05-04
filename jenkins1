@@ -1,0 +1,28 @@
+pipeline {
+    agent any
+
+    stages {
+        stage('Upload file to Artifactory') {
+            steps {
+                script {
+                    def scriptStatus = sh script: './upload_to_artifactory.sh', returnStatus: true
+                    
+                    if (scriptStatus != 0) {
+                        error "Shell script execution failed."
+                    }
+                }
+            }
+        }
+
+        stage('Build and Deploy') {
+            when {
+                expression { currentBuild.result == 'SUCCESS' }
+            }
+            steps {
+                // Add your build and deployment steps here
+            }
+        }
+    }
+}
+
+
