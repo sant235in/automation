@@ -19,6 +19,7 @@ do
 
   # Get the list of all users and their roles
   USERS=$(mongo --host $HOST:$PORT --authenticationDatabase admin --username $USERNAME --password $PASSWORD --quiet $db --eval "db.runCommand({usersInfo: 1})" | jq -r '.users[] | "\(.user),\(.roles | map(select(.role != "") | .role) | join(","))"')
+  #USERS=$(mongo --host $HOST:$PORT --authenticationDatabase admin --username $USERNAME --password $PASSWORD --quiet $db --eval "db.getUsers()" | jq -r '.[].user' | xargs -I {} mongo --host $HOST:$PORT --authenticationDatabase admin --username $USERNAME --password $PASSWORD --quiet $db --eval "printjson(db.getUser('{}'))" | jq -r '"User: \(.user), Roles: \(.roles | map(.role) | join(", "))"')
 
   # Print the database name and the list of users and their roles
   echo "Database: $db"
