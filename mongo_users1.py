@@ -1,22 +1,33 @@
 import pymongo
 import ssl
 
-# Set the MongoDB connection parameters
-HOST = "mongodb.example.com"
+# Define the connection parameters
+HOST = 'localhost'
 PORT = 27017
-USERNAME = "admin"
-PASSWORD = "password"
-CA_CERT_PATH = "/path/to/ca.crt"
-KEYFILE_PATH = "/path/to/client.pem"
-KEYFILE_PASSWORD = "client_password"
+USERNAME = 'admin'
+PASSWORD = 'password'
+CA_CERT = 'ca.pem'
+KEYFILE = 'key.pem'
+KEYFILE_PASSWORD = 'keyfile_password'
 
-# Create a TLS connection to the MongoDB instance
-tls_context = ssl.create_default_context(cafile=CA_CERT_PATH)
-tls_context.load_cert_chain(KEYFILE_PATH, password=KEYFILE_PASSWORD)
-client = pymongo.MongoClient(HOST, PORT, username=USERNAME, password=PASSWORD, ssl=True, ssl_context=tls_context)
+# Set up the TLS connection parameters
+tls_options = {
+    'ssl': True,
+    'ssl_ca_certs': CA_CERT,
+    'ssl_keyfile': KEYFILE,
+    'ssl_keyfile_password': KEYFILE_PASSWORD
+}
 
-# Iterate over all databases and list all users and their assigned roles
-for database in client.list_databases():
-    db = client[database.name]
-    for user in db.command("usersInfo"):
-        print("Database: " + database.name + ", User: " + user['user'] + ", Roles: " + str(user['roles']))
+# Connect to the MongoDB instance
+client = pymongo.MongoClient(HOST, PORT, username=USERNAME, password=PASSWORD, tls=tls_options)
+
+# Get a list of all the databases in the instance
+databases = client.list_database_names()
+
+# Loop through each database and list the users and their roles
+for database_name in databases:
+    database = client[database_name]
+    users = database.command('usersInfo')
+    print(f'Users in database {database_name}:')
+    for user in users['users']:
+        print(f'User: {user["user"]}, Roles: {user["roles"]}')
