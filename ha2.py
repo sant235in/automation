@@ -1,39 +1,28 @@
-import couchdb
 import random
 import string
 import time
+import couchdb
 
-# Set up CouchDB server and database
-server = couchdb.Server('http://localhost:5984/')
-db_name = 'test_db'
-if db_name not in server:
-    db = server.create(db_name)
-else:
-    db = server[db_name]
+# Set up the CouchDB client and database
+server = couchdb.Server("http://localhost:5984/")
+db = server['my_database']
 
-# Define the number of documents to generate
-num_docs = 1000
+# Generate random documents with a document size of 1KB
+def generate_random_doc():
+    random_string = ''.join(random.choices(string.ascii_uppercase + string.ascii_lowercase + string.digits, k=1024))
+    return {'data': random_string}
 
-# Define the size of each document
-doc_size = 1024
+# Write the generated documents to the database with acknowledgment w=2
+def write_docs():
+    doc_list = [generate_random_doc() for i in range(1000)]
+    result = db.update(doc_list, w=2)
+    return result
 
-# Define the write acknowledgment level
-acknowledgment = 'majority'
+# Run the write_docs function in a loop to simulate high workload on the cluster
+start_time = time.time()
+for i in range(10):
+    write_docs()
+end_time = time.time()
 
-# Generate and insert random documents
-for i in range(num_docs):
-    # Generate random data for document
-    data = ''.join(random.choices(string.ascii_lowercase + string.digits, k=doc_size))
-
-    # Create document ID
-    doc_id = f"doc_{i}"
-
-    # Insert document into database with write acknowledgment
-    doc = {'data': data}
-    db[doc_id] = doc
-    res = db[doc_id].revs_info()
-
-    # Wait for write acknowledgment
-    while len(res) < 2:
-        time.sleep(0.1)
-        res = db[doc_id].revs_info()
+# Print the time taken to write the documents
+print("Time taken to write 10,000 documents with acknowledgment w=2:", end_time - start_time, "seconds")
