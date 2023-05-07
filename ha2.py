@@ -1,53 +1,77 @@
-import random
-import string
 import time
+import random
 import couchdb
+from uuid import uuid4
 
-# Connect to CouchDB shard cluster
-nodes = ['http://node1:5984', 'http://node2:5984', 'http://node3:5984']
-couch = couchdb.Cluster(nodes)
+# Connection parameters for the CouchDB cluster
+server_url = 'http://localhost:5984/'
+db_name = 'mydatabase'
+username = 'admin'
+password = 'password'
 
-# Create database and enable sharding
-db_name = 'mydb'
-db = couch.create(db_name, partitioned=True)
+# Number of documents to be inserted
+num_docs = 1000
 
-# Create index on a field
-db.create_index(['field'])
+# Size of each document in KB
+doc_size = 1
 
-# Generate random data with 1KB document size and index on a field
-doc_size = 1024  # bytes
-doc_count = 10000
-docs = []
-for i in range(doc_count):
-    doc = {}
-    doc['field'] = ''.join(random.choices(string.ascii_lowercase, k=10))
-    doc['data'] = ''.join(random.choices(string.ascii_lowercase, k=doc_size))
-    docs.append(doc)
+# Field to create index on
+index_field = 'field'
 
-# Write data to the database with write acknowledgment of w=2
+# Connect to the CouchDB cluster
+couch = couchdb.Server(server_url)
+couch.resource.credentials = (username, password)
+
+# Create a new database
+try:
+    db = couch.create(db_name)
+except couchdb.http.PreconditionFailed as e:
+    db = couch[db_name]
+
+# Enable sharding on the database
+db.enable_sharding()
+
+# Create the index on the specified field
+db.create_index([index_field])
+
+# Generate random data with a specified document size
+def generate_data(size):
+    data = {}
+    for i in range(size):
+        data[str(i)] = str(uuid4())
+    return data
+
+# Insert a document into the database with write acknowledgment w=2
+def insert_doc(db, data):
+    doc_id, doc_rev = db.save(data, w=2)
+    return doc_id, doc_rev
+
+# Update a document in the database with write acknowledgment w=2
+def update_doc(db, doc_id, data):
+    doc = db[doc_id]
+    doc.update(data)
+    doc_id, doc_rev = db.save(doc, w=2)
+    return doc_id, doc_rev
+
+# Read a document from the database with read acknowledgment r=2
+def read_doc(db, doc_id):
+    doc = db.get(doc_id, r=2)
+    return doc
+
+# Insert, update, and read random data from the database simultaneously
 start_time = time.time()
-for doc in docs:
-    db.write(doc, w=2)
-write_time = time.time() - start_time
-print(f"Data write time: {write_time} seconds")
+for i in range(num_docs):
+    data = generate_data(doc_size)
+    doc_id, doc_rev = insert_doc(db, data)
+    data[index_field] = random.randint(0, doc_size-1)
+    doc_id, doc_rev = update_doc(db, doc_id, data)
+    doc = read_doc(db, doc_id)
+end_time = time.time()
 
-# Update data in the database with write acknowledgment of w=2
-update_docs = random.sample(docs, int(doc_count/2))
-start_time = time.time()
-for doc in update_docs:
-    doc['data'] = ''.join(random.choices(string.ascii_lowercase, k=doc_size))
-    db.write(doc, w=2)
-update_time = time.time() - start_time
-print(f"Data update time: {update_time} seconds")
+# Calculate the total time taken and the throughput
+total_time = end_time - start_time
+throughput = num_docs / total_time
 
-# Read data from the database with read acknowledgment of r=2
-read_docs = random.sample(docs, int(doc_count/2))
-start_time = time.time()
-for doc in read_docs:
-    result = db.read(doc['_id'], r=2)
-read_time = time.time() - start_time
-print(f"Data read time: {read_time} seconds")
-
-# Calculate the total time and print the performance benchmark
-total_time = write_time + update_time + read_time
-print(f"Total time: {total_time} seconds")
+# Print the results
+print("Total time taken: {:.2f} seconds".format(total_time))
+print("Throughput: {:.2f} docs/sec".format(throughput))
