@@ -1,70 +1,39 @@
-import requests
-import json
+import couchdb
+import random
+import string
 import time
 
-# Configurations
-base_url = "http://<haproxy-node>:<port>"
-db_name = "test_db"
-username = "<couchdb-username>"
-password = "<couchdb-password>"
-doc_size = 1024  # in bytes
+# Set up CouchDB server and database
+server = couchdb.Server('http://localhost:5984/')
+db_name = 'test_db'
+if db_name not in server:
+    db = server.create(db_name)
+else:
+    db = server[db_name]
+
+# Define the number of documents to generate
 num_docs = 1000
-num_iterations = 10
 
-# Generate random data with index on a field
-docs = []
+# Define the size of each document
+doc_size = 1024
+
+# Define the write acknowledgment level
+acknowledgment = 'majority'
+
+# Generate and insert random documents
 for i in range(num_docs):
-    doc = {"index": i}
-    doc["data"] = "a" * doc_size
-    docs.append(doc)
+    # Generate random data for document
+    data = ''.join(random.choices(string.ascii_lowercase + string.digits, k=doc_size))
 
-# Set up authentication header
-auth_header = requests.auth.HTTPBasicAuth(username, password)
+    # Create document ID
+    doc_id = f"doc_{i}"
 
-# Create database if it does not exist
-db_url = f"{base_url}/{db_name}"
-db_exists = requests.head(db_url, auth=auth_header)
-if db_exists.status_code == 404:
-    requests.put(db_url, auth=auth_header)
+    # Insert document into database with write acknowledgment
+    doc = {'data': data}
+    db[doc_id] = doc
+    res = db[doc_id].revs_info()
 
-# Start benchmarking
-total_time = 0
-for i in range(num_iterations):
-    print(f"Iteration {i+1}")
-    start_time = time.time()
-
-    # Insert documents
-    for doc in docs:
-        url = f"{db_url}/{doc['index']}"
-        headers = {"Content-Type": "application/json"}
-        response = requests.put(url, data=json.dumps(doc), headers=headers, auth=auth_header, params={"w": 2})
-        assert response.ok
-
-    # Read documents
-    for doc in docs:
-        url = f"{db_url}/{doc['index']}"
-        response = requests.get(url, auth=auth_header, params={"r": 2})
-        assert response.ok
-
-    # Update documents
-    for doc in docs:
-        url = f"{db_url}/{doc['index']}"
-        doc["data"] = "b" * doc_size
-        headers = {"Content-Type": "application/json"}
-        response = requests.put(url, data=json.dumps(doc), headers=headers, auth=auth_header, params={"w": 2})
-        assert response.ok
-
-    # Delete documents
-    for doc in docs:
-        url = f"{db_url}/{doc['index']}"
-        response = requests.delete(url, auth=auth_header, params={"w": 2})
-        assert response.ok
-
-    end_time = time.time()
-    iteration_time = end_time - start_time
-    total_time += iteration_time
-    print(f"Iteration time: {iteration_time:.2f}s")
-
-# Calculate average time per iteration
-avg_time = total_time / num_iterations
-print(f"Average time per iteration: {avg_time:.2f}s")
+    # Wait for write acknowledgment
+    while len(res) < 2:
+        time.sleep(0.1)
+        res = db[doc_id].revs_info()
