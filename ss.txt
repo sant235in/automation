@@ -1,21 +1,47 @@
-CICD Database Automation Deployment Framework:
+#!/bin/bash
 
-I successfully developed and implemented a comprehensive Continuous Integration and Continuous Deployment (CICD) database automation deployment framework for both Oracle and PostgreSQL databases. The framework covered end-to-end testing, including Standalone and Active-Active replication environments, ensuring the reliability and efficiency of our database deployments.
-As part of this initiative, I prepared automation scripts for Goldengate, a critical component for real-time data replication between databases.
-To enhance the scalability and maintainability of our automation, I integrated Jenkins pipeline with service accounts, enabling seamless job execution across multiple environments.
-Security being a top priority, I ensured the protection of sensitive data by encrypting passwords through Vault.
-My efforts didn't stop at implementation; I also thoroughly documented the entire process, enabling the team to understand and maintain the framework effectively.
-I presented the completed framework to the team for review, addressing their feedback and incorporating valuable suggestions.
-CouchDB Onboarding Proof of Concept (POC):
+# PostgreSQL database connection details
+db_user="your_username"
+db_name="your_database_name"
+db_host="your_database_host"
+db_port="your_database_port"
 
-I actively participated in the onboarding Proof of Concept (POC) for CouchDB, a NoSQL database management system.
-Throughout the POC, I contributed to end-to-end testing, assessing the feasibility and functionality of CouchDB for our specific use cases.
-My involvement in this POC helped the team in making informed decisions about adopting CouchDB as a potential solution.
-MongoDB 6.x Certification:
+# Table name and definition
+table_name="your_table_name"
+table_definition="(
+    id serial PRIMARY KEY,
+    name VARCHAR(255),
+    age INT
+)"
 
-I took a proactive role in the certification process for the latest version of MongoDB, version 6.x.
-By actively participating in the certification process, I acquired in-depth knowledge and expertise in the new features and functionalities introduced in MongoDB 6.x.
-My certification not only demonstrated my commitment to professional development but also contributed to enhancing the team's collective knowledge about the latest version of MongoDB.
-Overall, I am pleased with the accomplishments made in the past year. Through the successful implementation of the CICD database automation framework, participation in the CouchDB POC, and obtaining MongoDB 6.x certification, I have contributed to the team's growth and the enhancement of our database management practices. In the future, I am eager to continue exploring new technologies and methodologies to further improve our database operations.
+# Data to insert
+data_to_insert="(
+    'John Doe',
+    30
+)"
 
-Note: The review has been improved by providing specific details about each accomplishment, highlighting the scope of contributions, and emphasizing the impact on the team and projects.
+# SQL statements to create the table if not exists
+create_table_sql="CREATE TABLE IF NOT EXISTS $table_name $table_definition;"
+
+# SQL statement to insert data
+insert_data_sql="INSERT INTO $table_name (name, age) VALUES $data_to_insert;"
+
+# Connect to PostgreSQL and execute SQL statements
+psql -U "$db_user" -d "$db_name" -h "$db_host" -p "$db_port" -c "$create_table_sql"
+
+# Check if the table was created successfully
+if [ $? -eq 0 ]; then
+    echo "Table $table_name created successfully or already exists."
+
+    # Insert data into the table
+    psql -U "$db_user" -d "$db_name" -h "$db_host" -p "$db_port" -c "$insert_data_sql"
+
+    # Check if data was inserted successfully
+    if [ $? -eq 0 ]; then
+        echo "Data inserted into $table_name successfully."
+    else
+        echo "Error inserting data into $table_name."
+    fi
+else
+    echo "Error creating table $table_name."
+fi
