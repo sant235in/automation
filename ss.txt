@@ -1,47 +1,15 @@
-#!/bin/bash
+def branches = []
+def credentialsId = 'your_credentials_id' // Replace with your Git credentials ID
 
-# PostgreSQL database connection details
-db_user="your_username"
-db_name="your_database_name"
-db_host="your_database_host"
-db_port="your_database_port"
+try {
+    def git = checkout(
+        changelog: false,
+        poll: false,
+        scm: [$class: 'GitSCM', branches: [[name: '**']], doGenerateSubmoduleConfigurations: false, extensions: [], userRemoteConfigs: [[url: 'your_git_repository_url', credentialsId: credentialsId]]]
+    )
+    branches = git.branches
+} catch (Exception e) {
+    branches = ['Error retrieving branches']
+}
 
-# Table name and definition
-table_name="your_table_name"
-table_definition="(
-    id serial PRIMARY KEY,
-    name VARCHAR(255),
-    age INT
-)"
-
-# Data to insert
-data_to_insert="(
-    'John Doe',
-    30
-)"
-
-# SQL statements to create the table if not exists
-create_table_sql="CREATE TABLE IF NOT EXISTS $table_name $table_definition;"
-
-# SQL statement to insert data
-insert_data_sql="INSERT INTO $table_name (name, age) VALUES $data_to_insert;"
-
-# Connect to PostgreSQL and execute SQL statements
-psql -U "$db_user" -d "$db_name" -h "$db_host" -p "$db_port" -c "$create_table_sql"
-
-# Check if the table was created successfully
-if [ $? -eq 0 ]; then
-    echo "Table $table_name created successfully or already exists."
-
-    # Insert data into the table
-    psql -U "$db_user" -d "$db_name" -h "$db_host" -p "$db_port" -c "$insert_data_sql"
-
-    # Check if data was inserted successfully
-    if [ $? -eq 0 ]; then
-        echo "Data inserted into $table_name successfully."
-    else
-        echo "Error inserting data into $table_name."
-    fi
-else
-    echo "Error creating table $table_name."
-fi
+return branches
