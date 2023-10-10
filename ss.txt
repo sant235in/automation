@@ -1,15 +1,32 @@
 def branches = []
-def credentialsId = 'your_credentials_id' // Replace with your Git credentials ID
 
-try {
-    def git = checkout(
-        changelog: false,
-        poll: false,
-        scm: [$class: 'GitSCM', branches: [[name: '**']], doGenerateSubmoduleConfigurations: false, extensions: [], userRemoteConfigs: [[url: 'your_git_repository_url', credentialsId: credentialsId]]]
-    )
-    branches = git.branches
-} catch (Exception e) {
-    branches = ['Error retrieving branches']
+// Define your Git credentials (replace 'yourCredentialsID' with the actual ID of your Git credentials)
+def gitCredentials = com.cloudbees.plugins.credentials.CredentialsProvider.findCredentialById("yourCredentialsID")
+
+if (gitCredentials) {
+    // Define your Git repository URL
+    def gitRepoUrl = "https://github.com/yourusername/yourrepository.git"
+
+    // Use 'git ls-remote' to list branches from the Git repository
+    def cmd = "git ls-remote --heads $gitRepoUrl".execute()
+
+    // Set the credentials for the 'git' command
+    cmd.environment = ['GIT_ASKPASS': 'echo', 'GIT_SSH_COMMAND': "ssh -o StrictHostKeyChecking=no -i ${gitCredentials.privateKey}"]
+
+    // Read the output of the 'git ls-remote' command
+    def branchesOutput = cmd.text
+
+    // Split the output into lines
+    def branchLines = branchesOutput.readLines()
+
+    // Extract branch names from the lines
+    branchLines.each {
+        def parts = it.split('\t')
+        if (parts.size() == 2) {
+            branches.add(parts[1].replace('refs/heads/', ''))
+        }
+    }
 }
 
 return branches
+
