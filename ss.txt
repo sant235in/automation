@@ -2,35 +2,51 @@ pipeline {
     agent any
 
     stages {
-        stage('Select Branch') {
+        stage('List Branches') {
             steps {
                 script {
-                    // Get the list of Git branches using 'git ls-remote'
-                    def gitBranches = sh(
-                        script: 'git ls-remote --heads <your-git-repo-url>',
-                        returnStdout: true
-                    ).trim()
+                    // Define the Git repository URL and credentials
+                    def gitRepoUrl = 'https://your-git-repo-url.git'
+                    def gitCredentialsId = 'your-credentials-id' // Set the ID of the stored credentials in Jenkins
 
-                    // Split the list into an array of branch names
-                    def branchList = gitBranches.split('\n').collect {
-                        it.split('\t')[1].replace('refs/heads/', '')
-                    }
-
-                    // Prompt the user to select a branch
-                    def selectedBranch = input(
-                        id: 'branchSelection',
-                        message: 'Select a Git branch to build:',
-                        parameters: [choice(
-                            choices: branchList.join('\n'),
-                            description: 'Select the branch to build.'
-                        )]
+                    // Input step to select a branch
+                    def branchName = input(
+                        id: 'userInput',
+                        message: 'Select a Git branch',
+                        parameters: [choice(name: 'BRANCH', choices: getGitBranches(gitRepoUrl, gitCredentialsId), description: 'Select a branch to build')],
+                        submitterParameter: 'APPROVER',
+                        submitter: 'user',
+                        allowEmpty: false
                     )
 
-                    // Perform your build steps here using the selectedBranch
-                    echo "Selected Git branch: $selectedBranch"
-                    // Run your build steps using the selected branch
+                    // Checkout the selected branch
+                    checkout([$class: 'GitSCM', branches: [[name: "${branchName}"]], doGenerateSubmoduleConfigurations: false, extensions: [], submoduleCfg: [], userRemoteConfigs: [[credentialsId: gitCredentialsId, url: gitRepoUrl]]])
                 }
             }
         }
+        stage('Build') {
+            steps {
+                // Your build steps go here
+                sh 'echo "Building the selected branch"'
+                // Replace with actual build commands
+            }
+        }
     }
+}
+
+def getGitBranches(gitRepoUrl, credentialsId) {
+    def branches = []
+    try {
+        // Fetch the list of branches using 'git ls-remote'
+        def branchList = sh(script: "git ls-remote --heads ${gitRepoUrl}", returnStdout: true, returnStatus: true)
+        if (branchList == 0) {
+            // Split branch names by line and add them to the 'branches' list
+            branches = sh(script: "git ls-remote --heads ${gitRepoUrl} | awk -F/ '{print $3}'", returnStdout: true).split()
+        } else {
+            echo 'Error: Unable to fetch branches'
+        }
+    } catch (Exception e) {
+        echo "Error: ${e.getMessage()}"
+    }
+    return branches
 }
