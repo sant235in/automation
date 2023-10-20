@@ -1,15 +1,17 @@
-def branches = []
-def gitUrl = 'https://github.com/your/repo.git'  // Replace with your Git repository URL
-def gitCredentialsId = 'your-git-credentials-id'  // Replace with your Git credentials ID
+def credentialsId = 'your-credentials-id'  // Replace with your actual credentials ID
+def gitBranches = []
 
-def cmd = """
-git ls-remote --heads $gitUrl
-"""
+// Run 'git ls-remote' to list branches
+def branches = sh(
+    script: """
+    git ls-remote --refs --heads -q https://${credentialsId}@github.com/your/repo.git
+    """,
+    returnStdout: true
+).trim()
 
-def gitBranches = bat(script: cmd, returnStatus: true, credentialsId: gitCredentialsId).trim()
-
-if (gitBranches) {
-    branches = gitBranches.readLines().collect { it.split()[-1] }
+branches.eachLine { line ->
+    def parts = line.split('\t')
+    gitBranches.add(parts[1].replace('refs/heads/', ''))
 }
 
-return branches.join('\n')
+return gitBranches
