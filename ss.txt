@@ -34,6 +34,44 @@ pipeline {
     }
 }
 
+
+
+
+def getGitBranches(gitRepoUrl, credentialsId) {
+    def branches = []
+
+    try {
+        // Fetch the list of branches using 'git ls-remote'
+        def branchListCommand = "git ls-remote --heads ${gitRepoUrl}"
+
+        // Run the command using credentials and get the result
+        def branchListResult = sh(
+            script: branchListCommand,
+            returnStdout: true,
+            returnStatus: true,
+            quiet: true, // Prevent printing the command
+            credentialsId: credentialsId // Use specified credentials for authentication
+        )
+
+        if (branchListResult == 0) {
+            // Split branch names by line and add them to the 'branches' list
+            branches = sh(
+                script: "git ls-remote --heads ${gitRepoUrl} | awk -F/ '{print $3}'",
+                returnStdout: true
+            ).split()
+        } else {
+            error('Error: Unable to fetch branches')
+        }
+    } catch (Exception e) {
+        error("Error: ${e.getMessage()}")
+    }
+    
+    return branches
+}
+
+
+
+
 def getGitBranches(gitRepoUrl, credentialsId) {
     def branches = []
     try {
