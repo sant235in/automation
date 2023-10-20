@@ -1,17 +1,36 @@
-def credentialsId = 'your-credentials-id'  // Replace with your actual credentials ID
-def gitBranches = []
+pipeline {
+    agent any
 
-// Run 'git ls-remote' to list branches
-def branches = sh(
-    script: """
-    git ls-remote --refs --heads -q https://${credentialsId}@github.com/your/repo.git
-    """,
-    returnStdout: true
-).trim()
+    stages {
+        stage('Select Branch') {
+            steps {
+                script {
+                    // Get the list of Git branches using 'git ls-remote'
+                    def gitBranches = sh(
+                        script: 'git ls-remote --heads <your-git-repo-url>',
+                        returnStdout: true
+                    ).trim()
 
-branches.eachLine { line ->
-    def parts = line.split('\t')
-    gitBranches.add(parts[1].replace('refs/heads/', ''))
+                    // Split the list into an array of branch names
+                    def branchList = gitBranches.split('\n').collect {
+                        it.split('\t')[1].replace('refs/heads/', '')
+                    }
+
+                    // Prompt the user to select a branch
+                    def selectedBranch = input(
+                        id: 'branchSelection',
+                        message: 'Select a Git branch to build:',
+                        parameters: [choice(
+                            choices: branchList.join('\n'),
+                            description: 'Select the branch to build.'
+                        )]
+                    )
+
+                    // Perform your build steps here using the selectedBranch
+                    echo "Selected Git branch: $selectedBranch"
+                    // Run your build steps using the selected branch
+                }
+            }
+        }
+    }
 }
-
-return gitBranches
